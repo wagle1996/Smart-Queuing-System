@@ -1,4 +1,4 @@
-%%writefile queue_job.sh
+#%%writefile queue_job.sh
 #!/bin/bash
 
 exec 1>/output/stdout.log 2>/output/stderr.log
