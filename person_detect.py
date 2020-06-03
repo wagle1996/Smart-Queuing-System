@@ -44,9 +44,11 @@ class PersonDetect:
         self.model_structure=model_name+'.xml'
         self.device=device
         self.threshold=threshold
+        ie=IECore()
 
         try:
-            self.model=IENetwork(self.model_structure, self.model_weights)
+            self.model = ie.read_network(self.model_structure, self.model_weights)
+            #self.model=IENetwork(self.model_structure, self.model_weights)
         except Exception as e:
             raise ValueError("Could not Initialise the network. Have you enterred the correct model path?")
 
@@ -56,15 +58,14 @@ class PersonDetect:
         self.output_shape=self.model.outputs[self.output_name].shape
 
     def load_model(self):
-    '''
-    TODO: This method needs to be completed by you
-    '''
-        self.plugin = IECore()
-        self.network = self.plugin.load_network(network=self.model, device_name=self.device, num_requests=1) 
-        supported_layers_path = self.plugin.query_network(network=self.network, device_name="CPU")
+        '''
+        TODO: This method needs to be completed by you
+        '''
+        self.network = IECore().load_network(network=self.model, device_name=self.device, num_requests=1) 
+        supported_layers_path = IECore().query_network(network=self.model, device_name=self.device)
 
-    ### Check for any unsupported layers, and let the user know if anything is missing. Exit the program, if so.
-        keys=self.network.layers.keys()
+        ### Check for any unsupported layers, and let the user know if anything is missing. Exit the program, if so.
+        keys=self.model.layers.keys()
         for l in keys:
             unsupported_layers_path=""
             if l not in supported_layers_path:
@@ -72,15 +73,15 @@ class PersonDetect:
         if len(unsupported_layers_path) != 0:
             #print("Unsupported layers found: {}".format(unsupported_layers_path))
             #print("Check whether the extensions are available to add to IECore.")
-        exit(1) 
-        raise NotImplementedError
+            sys.exit(1) 
+        #raise NotImplementedError
         
     def predict(self, image):
         
-    '''
-    TODO: This method needs to be completed by you
+        '''
+        TODO: This method needs to be completed by you
         
-    '''
+        '''
         input_image=image
         input_img = self.preprocess_input(image)
               
@@ -96,14 +97,14 @@ class PersonDetect:
             outputs = infer_request_handle.outputs[self.output_name]
         
         
-        raise NotImplementedError
+        #raise NotImplementedError
     
     def draw_outputs(self, coords, image):
-    '''
-    TODO: This method needs to be completed by you
+        '''
+        TODO: This method needs to be completed by you
         
-    '''
-         det = []        
+        '''
+        det = []        
         for obj in coords[0][0]:
             # Draw bounding box for object when it's probability is more than the specified threshold
             if obj[2] > self.threshold:
@@ -114,17 +115,17 @@ class PersonDetect:
                 cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 55, 255), 1)
                 det.append(obj)
         return det, image
-        raise NotImplementedError
+        #raise NotImplementedError
 
     def preprocess_outputs(self, outputs):
-    '''
-    TODO: This method needs to be completed by you
-    '''
+        '''
+        TODO: This method needs to be completed by you
+        '''
         image = cv2.resize(image, (self.input_shape[3], self.input_shape[2]))
         image = image.transpose((2, 0, 1))
         image = image.reshape(1, 3, self.input_shape[2], self.input_shape[3])
         return image
-        raise NotImplementedError
+        #raise NotImplementedError
 
     def preprocess_input(self, image):
         input_img = image
@@ -138,9 +139,9 @@ class PersonDetect:
         # Change image from HWC to CHW
         input_img = input_img.transpose((2, 0, 1))
         input_img = input_img.reshape((n, c, h, w))
-    '''
-    TODO: This method needs to be completed by you
-    '''
+        '''
+        TODO: This method needs to be completed by you
+        '''
         raise NotImplementedError
 
 
