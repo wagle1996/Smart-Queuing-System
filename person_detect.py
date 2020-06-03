@@ -1,5 +1,8 @@
 #%%writefile person_detect.py
 
+
+%%writefile person_detect.py
+
 import numpy as np
 import time
 from openvino.inference_engine import IENetwork, IECore
@@ -23,13 +26,22 @@ class Queue:
         for q in self.queues:
             x_min, y_min, x_max, y_max=q
             frame=image[y_min:y_max, x_min:x_max]
-            yield frame
+            return frame
     
-    def check_coords(self, coords):
+    def check_coords(self, coords,initial_w,initial_h):
         d={k+1:0 for k in range(len(self.queues))}
+        dummy = ['0', '1' , '2', '3']
         for coord in coords:
+            xmin = int(coord[3] * initial_w)
+            ymin = int(coord[4] * initial_h)
+            xmax = int(coord[5] * initial_w)
+            ymax = int(coord[6] * initial_h)
+            dummy[0] = xmin
+            dummy[1] = ymin
+            dummy[2] = xmax
+            dummy[3] = ymax
             for i, q in enumerate(self.queues):
-                if coord[0]>q[0] and coord[2]<q[2]:
+                if dummy[0]>q[0] and dummy[2]<q[2]:
                     d[i+1]+=1
         return d
 
@@ -44,11 +56,10 @@ class PersonDetect:
         self.model_structure=model_name+'.xml'
         self.device=device
         self.threshold=threshold
-        ie=IECore()
+        self.input_name=None
 
         try:
-            self.model = ie.read_network(self.model_structure, self.model_weights)
-            #self.model=IENetwork(self.model_structure, self.model_weights)
+            self.model = IECore().read_network(self.model_structure, self.model_weights)
         except Exception as e:
             raise ValueError("Could not Initialise the network. Have you enterred the correct model path?")
 
@@ -58,52 +69,35 @@ class PersonDetect:
         self.output_shape=self.model.outputs[self.output_name].shape
 
     def load_model(self):
-        '''
-        TODO: This method needs to be completed by you
-        '''
-        self.network = IECore().load_network(network=self.model, device_name=self.device, num_requests=1) 
-        supported_layers_path = IECore().query_network(network=self.model, device_name=self.device)
-
-        ### Check for any unsupported layers, and let the user know if anything is missing. Exit the program, if so.
+        self.ie=IECore()
+        self.network = self.ie.load_network(network=self.model, device_name=self.device, num_requests=1) 
+        supported_layers_path = self.ie.query_network(network=self.model, device_name=self.device)
         keys=self.model.layers.keys()
         for l in keys:
             unsupported_layers_path=""
             if l not in supported_layers_path:
                 unsupported_layers_path=l
         if len(unsupported_layers_path) != 0:
-            #print("Unsupported layers found: {}".format(unsupported_layers_path))
-            #print("Check whether the extensions are available to add to IECore.")
             sys.exit(1) 
-        #raise NotImplementedError
+       
+                
         
-    def predict(self, image):
-        
-        '''
-        TODO: This method needs to be completed by you
-        
-        '''
-        input_image=image
-        input_img = self.preprocess_input(image)
+    def predict(self, image,w,h):
+        input_img=image
+        image = self.preprocess_input(image)
               
-        # Inference Block
-        #print('Inference block...')
-        input_dict={input_name: input_img}  
         
-        # Start asynchronous inference.
+        input_dict={self.input_name: image}  
 
-        infer_request_handle = self.net.start_async(request_id=0, inputs=input_dict)
+        infer_request_handle = self.network.start_async(request_id=0, inputs=input_dict)
         infer_status = infer_request_handle.wait()
         if infer_status == 0:
             outputs = infer_request_handle.outputs[self.output_name]
         
-        
-        #raise NotImplementedError
+        coords, image = self.draw_outputs(outputs, input_img,w,h)    
+        return coords, input_img
     
-    def draw_outputs(self, coords, image):
-        '''
-        TODO: This method needs to be completed by you
-        
-        '''
+    def draw_outputs(self, coords, image,w,h):
         det = []        
         for obj in coords[0][0]:
             # Draw bounding box for object when it's probability is more than the specified threshold
@@ -115,35 +109,12 @@ class PersonDetect:
                 cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 55, 255), 1)
                 det.append(obj)
         return det, image
-        #raise NotImplementedError
 
-    def preprocess_outputs(self, outputs):
-        '''
-        TODO: This method needs to be completed by you
-        '''
+    def preprocess_input(self, image):
         image = cv2.resize(image, (self.input_shape[3], self.input_shape[2]))
         image = image.transpose((2, 0, 1))
         image = image.reshape(1, 3, self.input_shape[2], self.input_shape[3])
         return image
-        #raise NotImplementedError
-
-    def preprocess_input(self, image):
-        input_img = image
-        
-        # Preprocessing input
-       
-        n, c, h, w = self.input_shape
-        
-        input_img=cv2.resize(input_img, (w, h), interpolation = cv2.INTER_AREA)
-        
-        # Change image from HWC to CHW
-        input_img = input_img.transpose((2, 0, 1))
-        input_img = input_img.reshape((n, c, h, w))
-        '''
-        TODO: This method needs to be completed by you
-        '''
-        raise NotImplementedError
-
 
 def main(args):
     model=args.model
@@ -190,8 +161,8 @@ def main(args):
                 break
             counter+=1
             
-            coords, image= pd.predict(frame)
-            num_people= queue.check_coords(coords)
+            coords, image= pd.predict(frame,initial_w,initial_h)
+            num_people= queue.check_coords(coords,initial_w, initial_h)
             print(f"Total People in frame = {len(coords)}")
             print(f"Number of people in queue = {num_people}")
             out_text=""
