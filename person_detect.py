@@ -1,5 +1,5 @@
 #%%writefile person_detect.py
-
+#creates job submission file
 
 %%writefile person_detect.py
 
